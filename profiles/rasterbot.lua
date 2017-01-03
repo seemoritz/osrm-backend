@@ -1,4 +1,4 @@
-api_version = 0
+api_version = 1
 -- Rasterbot profile
 
 -- Minimalist node_ and way_functions in order to test source_ and segment_functions

@@ -164,7 +164,6 @@ class EdgeBasedGraphFactory
     CompressedEdgeContainer &m_compressed_edge_container;
 
     ProfileProperties profile_properties;
-    bool fallback_to_duration;
 
     const util::NameTable &name_table;
     std::vector<std::uint32_t> &turn_lane_offsets;

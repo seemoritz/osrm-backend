@@ -2,7 +2,14 @@
 Feature: Turn Penalties
 
     Background:
-        Given the profile "turnbot"
+        Given the profile file "testbot" extended with
+          """
+          properties.weight_name = 'duration'
+          api_version = 1
+          function turn_function (turn)
+              turn.duration = 20 * math.abs(turn.angle) / 180 -- penalty
+          end
+          """
 
     Scenario: Bike - turns should incur a delay that depend on the angle
 

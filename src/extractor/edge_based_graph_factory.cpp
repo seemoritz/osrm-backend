@@ -49,10 +49,9 @@ EdgeBasedGraphFactory::EdgeBasedGraphFactory(
       m_node_based_graph(std::move(node_based_graph)),
       m_restriction_map(std::move(restriction_map)), m_barrier_nodes(barrier_nodes),
       m_traffic_lights(traffic_lights), m_compressed_edge_container(compressed_edge_container),
-      profile_properties(std::move(profile_properties)),
-      fallback_to_duration(std::string(profile_properties.weight_name) == "duration"),
-      name_table(name_table), turn_lane_offsets(turn_lane_offsets),
-      turn_lane_masks(turn_lane_masks), lane_description_map(lane_description_map)
+      profile_properties(std::move(profile_properties)), name_table(name_table),
+      turn_lane_offsets(turn_lane_offsets), turn_lane_masks(turn_lane_masks),
+      lane_description_map(lane_description_map)
 {
 }
 
@@ -525,39 +524,15 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
                     }
 
                     // compute weight and duration penalties
-                    TurnPenalty weight_penalty = 0;
-                    TurnPenalty duration_penalty = 0;
-                    if (m_traffic_lights.find(node_at_center_of_intersection) !=
-                        m_traffic_lights.end())
-                    {
-                        // FIXME we can't assume this here!
-                        weight_penalty += profile_properties.traffic_signal_penalty;
-                        duration_penalty += profile_properties.traffic_signal_penalty;
-                    }
-
-                    ExtractionTurn extracted_turn(180. - turn.angle,
-                                                  turn.instruction.type,
-                                                  turn.instruction.direction_modifier);
+                    auto is_traffic_light = m_traffic_lights.count(node_at_center_of_intersection);
+                    ExtractionTurn extracted_turn(turn, is_traffic_light);
                     scripting_environment.ProcessTurn(extracted_turn);
 
-                    // TODO port this to the turn function
-                    // don't add turn penalty if it is not an actual turn. This heuristic is
-                    // necessary since OSRM cannot handle looping roads/parallel roads
-                    // if (turn_instruction.type != guidance::TurnType::NoTurn)
-                    //    distance += turn_penalty;
-
-                    // convert penalty seconds to signed 16bit deci-seconds
-                    // we limit the duration/weight of turn penalties to 2^15-1 which roughly
-                    // translates to 54 minutes
-                    BOOST_ASSERT(
-                        std::numeric_limits<TurnPenalty>::min() <= 10. * extracted_turn.weight &&
-                        10. * extracted_turn.weight <= std::numeric_limits<TurnPenalty>::max());
-                    BOOST_ASSERT(
-                        std::numeric_limits<TurnPenalty>::min() <= 10. * extracted_turn.duration &&
-                        10. * extracted_turn.duration < std::numeric_limits<TurnPenalty>::max());
-                    weight_penalty += boost::numeric_cast<TurnPenalty>(extracted_turn.weight * 10);
-                    duration_penalty +=
-                        boost::numeric_cast<TurnPenalty>(extracted_turn.duration * 10);
+                    // turn penalties are limited to [-2^15, 2^15) which roughly
+                    // translates to 54 minutes and fits signed 16bit deci-seconds
+                    auto weight_penalty = boost::numeric_cast<TurnPenalty>(extracted_turn.weight);
+                    auto duration_penalty =
+                        boost::numeric_cast<TurnPenalty>(extracted_turn.duration);
 
                     BOOST_ASSERT(SPECIAL_NODEID != edge_data1.edge_id);
                     BOOST_ASSERT(SPECIAL_NODEID != edge_data2.edge_id);
@@ -576,7 +551,7 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
                     turn_weight_penalties.push_back(weight_penalty);
 
                     // the weight and the duration are not the same thing
-                    if (!fallback_to_duration)
+                    if (!profile_properties.fallback_to_duration)
                     {
                         BOOST_ASSERT(turn_duration_penalties.size() == turn_id);
                         turn_duration_penalties.push_back(duration_penalty);
@@ -679,7 +654,7 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
     turn_duration_penalties_file.write(
         reinterpret_cast<const char *>(&turn_duration_penalties_header),
         sizeof(turn_duration_penalties_header));
-    if (!fallback_to_duration)
+    if (!profile_properties.fallback_to_duration)
     {
         BOOST_ASSERT(turn_weight_penalties.size() == turn_duration_penalties.size());
         turn_duration_penalties_file.write(

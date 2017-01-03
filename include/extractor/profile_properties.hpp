@@ -22,7 +22,8 @@ struct ProfileProperties
     ProfileProperties()
         : traffic_signal_penalty(0), u_turn_penalty(0),
           max_speed_for_map_matching(DEFAULT_MAX_SPEED), continue_straight_at_waypoint(true),
-          use_turn_restrictions(false), left_hand_driving(false), weight_name{"duration"}
+          use_turn_restrictions(false), left_hand_driving(false), fallback_to_duration(true),
+          weight_name{"duration"}
     {
         BOOST_ASSERT(weight_name[MAX_WEIGHT_NAME_LENGTH] == '\0');
     }
@@ -55,6 +56,8 @@ struct ProfileProperties
         // Make sure this is always zero terminated
         BOOST_ASSERT(weight_name[count - 1] == '\0');
         BOOST_ASSERT(weight_name[MAX_WEIGHT_NAME_LENGTH] == '\0');
+        // Set lazy fallback flag
+        fallback_to_duration = name == "duration";
     }
 
     std::string GetWeightName() const
@@ -74,6 +77,7 @@ struct ProfileProperties
     //! flag used for restriction parser (e.g. used for the walk profile)
     bool use_turn_restrictions;
     bool left_hand_driving;
+    bool fallback_to_duration;
     //! stores the name of the weight (e.g. 'duration', 'distance', 'safety')
     char weight_name[MAX_WEIGHT_NAME_LENGTH + 1];
 };

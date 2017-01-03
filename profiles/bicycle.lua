@@ -1,4 +1,4 @@
-api_version = 0
+api_version = 1
 
 -- Bicycle profile
 
@@ -92,7 +92,6 @@ surface_speeds = {
 }
 
 -- these need to be global because they are accesed externaly
-properties.traffic_signal_penalty        = 2
 properties.max_speed_for_map_matching    = 110/3.6 -- kmph -> m/s
 properties.use_turn_restrictions         = false
 properties.continue_straight_at_waypoint = false
@@ -101,6 +100,7 @@ properties.weight_name                   = 'duration'
 
 local obey_oneway               = true
 local ignore_areas              = true
+local traffic_light_penalty     = 2
 local uturn_penalty             = 20
 local turn_penalty              = 6
 local turn_bias                 = 1.4
@@ -435,5 +435,7 @@ function turn_function(turn)
     turn.duration = turn.duration + uturn_penalty
   end
 
-  turn.weight = turn.duration
+  if turn.has_traffic_light then
+     turn.duration = turn.duration + traffic_light_penalty
+  end
 end

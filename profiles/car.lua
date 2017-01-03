@@ -1,4 +1,4 @@
-api_version = 0
+api_version = 1
 
 -- Car profile
 local find_access_tag = require("lib/access").find_access_tag
@@ -190,7 +190,6 @@ maxspeed_table = {
 }
 
 -- set profile properties
-properties.traffic_signal_penalty          = 2
 properties.max_speed_for_map_matching      = 180/3.6 -- 180kmph -> m/s
 properties.use_turn_restrictions           = true
 properties.continue_straight_at_waypoint   = true
@@ -201,6 +200,7 @@ properties.weight_name                     = 'duration'
 
 local side_road_speed_multiplier = 0.8
 local turn_penalty               = 7.5
+local traffic_light_penalty      = 2
 local uturn_penalty              = 20
 
 -- Note: this biases right-side driving.  Should be
@@ -744,6 +744,10 @@ function turn_function (turn)
 
     if turn.direction_modifier == direction_modifier.u_turn then
       turn.duration = turn.duration + uturn_penalty
+    end
+
+    if turn.has_traffic_light then
+       turn.duration = turn.duration + traffic_light_penalty
     end
 
     -- for distance based routing we don't want to have penalties based on turn angle

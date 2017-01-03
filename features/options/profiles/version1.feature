@@ -1,61 +1,18 @@
-Feature: Profile API version 0
+Feature: Profile API version 1
 
     Background:
         Given a grid size of 100 meters
 
-    Scenario: Not-defined API version
-        Given the profile file
-          """
-function way_function(way, result)
-  result.forward_mode = mode.driving
-  result.forward_speed = 1
-end
-          """
-        And the node map
-          """
-            ab
-          """
-        And the ways
-            | nodes  |
-            | ab     |
-        And the data has been saved to disk
-
-        When I try to run "osrm-extract --profile {profile_file} {osm_file}"
-        Then it should exit successfully
-        And stderr should not contain "Invalid profile API version"
-
-    Scenario: Out-bound API version
-        Given the profile file
-          """
-api_version = 2
-          """
-        And the node map
-          """
-            ab
-          """
-        And the ways
-            | nodes  |
-            | ab     |
-        And the data has been saved to disk
-
-        When I try to run "osrm-extract --profile {profile_file} {osm_file}"
-        Then it should exit with an error
-        And stderr should contain "Invalid profile API version"
-
-
     Scenario: Basic profile function calls and property values
         Given the profile file
            """
-api_version = 0
+api_version = 1
 
 -- set profile properties
-properties.u_turn_penalty                  = 20
-properties.traffic_signal_penalty          = 2
 properties.max_speed_for_map_matching      = 180/3.6
 properties.use_turn_restrictions           = true
 properties.continue_straight_at_waypoint   = true
-properties.left_hand_driving               = false
-properties.weight_name                     = 'duration'
+properties.weight_name                     = 'test_version1'
 
 function node_function (node, result)
   print ('node_function ' .. node:id())
@@ -63,6 +20,7 @@ end
 
 function way_function(way, result)
   result.name = way:get_value_by_key('name')
+  result.weight = 10
   result.forward_mode = mode.driving
   result.backward_mode = mode.driving
   result.forward_speed = 36
@@ -70,13 +28,14 @@ function way_function(way, result)
   print ('way_function ' .. way:id() .. ' ' .. result.name)
 end
 
-function turn_function (angle)
-  print('turn_function ' .. angle)
-  return angle == 0 and 0 or 42
+function turn_function (turn)
+  print('turn_function', turn.angle, turn.turn_type, turn.direction_modifier, turn.has_traffic_light)
+  turn.weight = turn.angle == 0 and 0 or 4.2
+  turn.duration = turn.weight
 end
 
-function segment_function (source, target, distance, weight)
-    print ('segment_function ' .. source.lon .. ' ' .. source.lat)
+function segment_function (segment)
+    print ('segment_function ' .. segment.source.lon .. ' ' .. segment.source.lat)
 end
            """
         And the node map

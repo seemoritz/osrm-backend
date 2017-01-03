@@ -35,8 +35,7 @@ namespace TurnLaneType = guidance::TurnLaneType;
 
 ExtractorCallbacks::ExtractorCallbacks(ExtractionContainers &extraction_containers_,
                                        const ProfileProperties &properties)
-    : external_memory(extraction_containers_),
-      fallback_to_duration(std::strcmp(properties.weight_name, "duration") == 0)
+    : external_memory(extraction_containers_), fallback_to_duration(properties.fallback_to_duration)
 {
     // we reserved 0, 1, 2, 3 for the empty case
     string_map[MapKey("", "", "", "")] = 0;

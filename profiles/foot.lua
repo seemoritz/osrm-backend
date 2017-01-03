@@ -1,4 +1,4 @@
-api_version = 0
+api_version = 1
 -- Foot profile
 
 local find_access_tag = require("lib/access").find_access_tag
@@ -62,11 +62,12 @@ leisure_speeds = {
   ["track"] = walking_speed
 }
 
-properties.traffic_signal_penalty        = 2
 properties.max_speed_for_map_matching    = 40/3.6 -- kmph -> m/s
 properties.use_turn_restrictions         = false
 properties.continue_straight_at_waypoint = false
 properties.weight_name                   = 'duration'
+
+local traffic_light_penalty              = 2
 
 function get_restrictions(vector)
   for i,v in ipairs(restrictions) do
@@ -216,4 +217,10 @@ function way_function (way, result)
       result.backward_speed  = math.min(result.backward_speed, surface_speed)
     end
   end
+end
+
+function turn_function (turn)
+    if turn.has_traffic_light then
+       turn.duration = traffic_light_penalty
+    end
 end

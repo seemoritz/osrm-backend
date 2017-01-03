@@ -362,6 +362,8 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
                                                &ExtractionTurn::turn_type,
                                                "direction_modifier",
                                                &ExtractionTurn::direction_modifier,
+                                               "has_traffic_light",
+                                               &ExtractionTurn::has_traffic_light,
                                                "weight",
                                                &ExtractionTurn::weight,
                                                "duration",
@@ -416,6 +418,8 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
     context.has_node_function = node_function.valid();
     context.has_way_function = way_function.valid();
     context.has_segment_function = segment_function.valid();
+
+    // Check profile API version
     auto maybe_version = context.state.get<sol::optional<int>>("api_version");
     if (maybe_version)
     {
@@ -429,6 +433,17 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
                               " only versions from " + std::to_string(SUPPORTED_MIN_API_VERSION) +
                               " to " + std::to_string(SUPPORTED_MAX_API_VERSION) +
                               " are supported." + SOURCE_REF);
+    }
+
+    switch (context.api_version)
+    {
+    case 1:
+        BOOST_ASSERT(context.properties.GetUturnPenalty() == 0);
+        BOOST_ASSERT(context.properties.GetTrafficSignalPenalty() == 0);
+        break;
+    case 0:
+        BOOST_ASSERT(context.properties.GetWeightName() == "duration");
+        break;
     }
 }
 
@@ -553,8 +568,46 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
     if (context.has_turn_penalty_function)
     {
         sol::function turn_function = context.state["turn_function"];
+        switch (context.api_version)
+        {
+        case 1:
+            turn_function(turn);
 
-        turn_function(turn);
+            // Convert duration penalty seconds to deciseconds
+            turn.duration *= 10.;
+
+            // Turn weight falls back to the duration value in deciseconds
+            // or uses the extracted unit-less weight value
+            if (context.properties.fallback_to_duration)
+                turn.weight = turn.duration;
+
+            break;
+        case 0:
+
+            if (turn.turn_type != guidance::TurnType::NoTurn)
+            {
+                turn.duration = turn_function(turn.angle);
+
+                // add traffic light penalty
+                if (turn.has_traffic_light)
+                    turn.duration += context.properties.traffic_signal_penalty;
+
+                // add U-turn penalty
+                if (turn.direction_modifier == guidance::DirectionModifier::UTurn)
+                    turn.duration += context.properties.u_turn_penalty;
+            }
+            else
+            {
+                // Use zero turn penalty if it is not an actual turn. This heuristic is necessary
+                // since OSRM cannot handle looping roads/parallel roads
+                turn.duration = 0.;
+            }
+
+            // Turn weight falls back to the duration value in deciseconds
+            BOOST_ASSERT(turn.weight == 0);
+            turn.weight = turn.duration;
+            break;
+        }
     }
 }
 
@@ -565,7 +618,15 @@ void Sol2ScriptingEnvironment::ProcessSegment(ExtractionSegment &segment)
     if (context.has_segment_function)
     {
         sol::function segment_function = context.state["segment_function"];
-        segment_function(segment);
+        switch (context.api_version)
+        {
+        case 1:
+            segment_function(segment);
+            break;
+        case 0:
+            segment_function(segment.source, segment.target, segment.distance, segment.weight);
+            break;
+        }
     }
 }
 
