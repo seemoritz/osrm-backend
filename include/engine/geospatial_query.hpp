@@ -369,8 +369,8 @@ template <typename RTreeT, typename DataFacadeT> class GeospatialQuery
         // Find the node-based-edge that this belongs to, and directly
         // calculate the forward_weight, forward_offset, reverse_weight, reverse_offset
 
-        int forward_offset = 0, forward_weight = 0, forward_duration = 0;
-        int reverse_offset = 0, reverse_weight = 0, reverse_duration = 0;
+        EdgeWeight forward_offset = 0, forward_weight = 0, forward_duration = 0;
+        EdgeWeight reverse_offset = 0, reverse_weight = 0, reverse_duration = 0;
 
         const std::vector<EdgeWeight> forward_weight_vector =
             datafacade.GetUncompressedForwardWeights(data.packed_geometry_id);

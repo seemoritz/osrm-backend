@@ -41,7 +41,8 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                             const bool source_traversed_in_reverse,
                                             const bool target_traversed_in_reverse)
 {
-    const double constexpr ZERO_DURATION = 0., ZERO_DISTANCE = 0., ZERO_WEIGHT = 0.;
+    const double constexpr ZERO_DURATION = 0., ZERO_DISTANCE = 0.;
+    const EdgeWeight ZERO_WEIGHT = 0;
     const constexpr char *NO_ROTARY_NAME = "";
     const EdgeWeight source_weight =
         source_traversed_in_reverse ? source_node.reverse_weight : source_node.forward_weight;
@@ -88,8 +89,8 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
         // but a RouteStep is with regard to the segment after the turn.
         // We need to skip the first segment because it is already covered by the
         // initial start of a route
-        int segment_duration = 0;
-        int segment_weight = 0;
+        EdgeWeight segment_duration = 0;
+        EdgeWeight segment_weight = 0;
 
         // some name changes are not announced in our processing. For these, we have to keep the
         // first name on the segment
@@ -120,7 +121,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                           NO_ROTARY_NAME,
                                           segment_duration / 10.0,
                                           distance,
-                                          segment_weight / 10.0,
+                                          segment_weight,
                                           path_point.travel_mode,
                                           maneuver,
                                           leg_geometry.FrontIndex(segment_index),
@@ -185,8 +186,8 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
             }
         }
         const auto distance = leg_geometry.segment_distances[segment_index];
-        const int duration = segment_duration + target_duration;
-        const int weight = segment_weight + target_weight;
+        const EdgeWeight duration = segment_duration + target_duration;
+        const EdgeWeight weight = segment_weight + target_weight;
         BOOST_ASSERT(duration >= 0);
         steps.push_back(RouteStep{step_name_id,
                                   facade.GetNameForID(step_name_id),
@@ -197,7 +198,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   distance,
-                                  weight / 10.,
+                                  weight,
                                   target_mode,
                                   maneuver,
                                   leg_geometry.FrontIndex(segment_index),
@@ -213,8 +214,8 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
         // |---| source_duration
         // |---------| target_duration
 
-        int duration = target_duration - source_duration;
-        int weight = target_weight - source_weight;
+        const EdgeWeight duration = target_duration - source_duration;
+        const EdgeWeight weight = target_weight - source_weight;
         BOOST_ASSERT(duration >= 0);
 
         steps.push_back(RouteStep{source_node.name_id,
@@ -226,7 +227,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   leg_geometry.segment_distances[segment_index],
-                                  weight / 10.,
+                                  weight,
                                   source_mode,
                                   std::move(maneuver),
                                   leg_geometry.FrontIndex(segment_index),

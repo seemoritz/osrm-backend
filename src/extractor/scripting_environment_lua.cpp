@@ -435,6 +435,7 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
                               " are supported." + SOURCE_REF);
     }
 
+    // Assert that version-dependent properties were not changed by profile
     switch (context.api_version)
     {
     case 1:

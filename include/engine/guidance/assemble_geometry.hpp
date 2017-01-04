@@ -78,7 +78,7 @@ inline LegGeometry assembleGeometry(const datafacade::BaseDataFacade &facade,
         geometry.annotations.emplace_back(
             LegGeometry::Annotation{current_distance,
                                     path_point.duration_until_turn / 10.,
-                                    path_point.weight_until_turn / 10.,
+                                    path_point.weight_until_turn,
                                     path_point.datasource_id});
         geometry.locations.push_back(std::move(coordinate));
         geometry.osm_node_ids.push_back(facade.GetOSMNodeIDOfNode(path_point.turn_via_node));
@@ -97,7 +97,7 @@ inline LegGeometry assembleGeometry(const datafacade::BaseDataFacade &facade,
     geometry.annotations.emplace_back(
         LegGeometry::Annotation{current_distance,
                                 target_node.forward_duration / 10.,
-                                target_node.forward_weight / 10.,
+                                target_node.forward_weight,
                                 forward_datasources[target_node.fwd_segment_position]});
 
     geometry.segment_offsets.push_back(geometry.locations.size());

@@ -84,7 +84,7 @@ namespace contractor
 {
 
 // Returns duration in deci-seconds
-inline EdgeWeight distanceAndSpeedToWeight(double distance_in_meters, double speed_in_kmh)
+inline EdgeWeight ConvertToDuration(double distance_in_meters, double speed_in_kmh)
 {
     BOOST_ASSERT(speed_in_kmh > 0);
     const double speed_in_ms = speed_in_kmh / 3.6;
@@ -94,7 +94,7 @@ inline EdgeWeight distanceAndSpeedToWeight(double distance_in_meters, double spe
 
 // Returns updated edge weight
 template <class IterType>
-void getNewWeight(IterType speed_iter,
+void GetNewWeight(IterType speed_iter,
                   const double &segment_length,
                   const std::vector<std::string> &segment_speed_filenames,
                   const EdgeWeight current_duration,
@@ -104,24 +104,22 @@ void getNewWeight(IterType speed_iter,
 {
     new_segment_duration =
         (speed_iter->speed_source.speed > 0)
-            ? distanceAndSpeedToWeight(segment_length, speed_iter->speed_source.speed)
+            ? ConvertToDuration(segment_length, speed_iter->speed_source.speed)
             : INVALID_EDGE_WEIGHT;
     new_segment_weight =
-        (speed_iter->speed_source.weight == INVALID_EDGE_WEIGHT)
-            ? new_segment_duration
-            : distanceAndSpeedToWeight(
-                  segment_length,
-                  speed_iter->speed_source.weight); // TODO decouple weight and duration
+        (speed_iter->speed_source.weight != INVALID_EDGE_WEIGHT)
+            ? speed_iter->speed_source.weight
+            : new_segment_duration;
 
-    // the check here is enabled by the `--edge-weight-updates-over-factor` flag
-    // it logs a warning if the new weight exceeds a heuristic of what a reasonable weight update is
+    // the check here is enabled by the `--edge-weight-updates-over-factor` flag it logs a warning
+    // if the new duration exceeds a heuristic of what a reasonable duration update is
     if (log_edge_updates_factor > 0 && current_duration != 0)
     {
-        auto new_secs = new_segment_duration / 10.0;
-        auto old_secs = current_duration / 10.0;
-        auto approx_original_speed = (segment_length / old_secs) * 3.6;
-        if (current_duration >= (new_segment_weight * log_edge_updates_factor))
+        if (current_duration >= (new_segment_duration * log_edge_updates_factor))
         {
+            auto new_secs = new_segment_duration / 10.0;
+            auto old_secs = current_duration / 10.0;
+            auto approx_original_speed = (segment_length / old_secs) * 3.6;
             auto speed_file = segment_speed_filenames.at(speed_iter->speed_source.source - 1);
             util::Log(logWARNING) << "[weight updates] Edge weight update from " << old_secs
                                   << "s to " << new_secs
@@ -764,7 +762,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                 if (forward_speed_iter != segment_speed_lookup.end())
                 {
                     EdgeWeight new_segment_weight, new_segment_duration;
-                    getNewWeight(forward_speed_iter,
+                    GetNewWeight(forward_speed_iter,
                                  segment_length,
                                  segment_speed_filenames,
                                  current_fwd_duration,
@@ -799,7 +797,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                 if (reverse_speed_iter != segment_speed_lookup.end())
                 {
                     EdgeWeight new_segment_weight, new_segment_duration;
-                    getNewWeight(reverse_speed_iter,
+                    GetNewWeight(reverse_speed_iter,
                                  segment_length,
                                  segment_speed_filenames,
                                  current_rev_duration,
@@ -979,7 +977,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                 {
                     if (speed_iter->speed_source.speed > 0)
                     {
-                        const auto new_segment_weight = distanceAndSpeedToWeight(
+                        const auto new_segment_weight = ConvertToDuration(
                             segmentblocks[i].segment_length, speed_iter->speed_source.speed);
                         new_weight += new_segment_weight;
                     }

@@ -129,19 +129,15 @@ inline RouteLeg assembleLeg(const datafacade::BaseDataFacade &facade,
                             const bool target_traversed_in_reverse,
                             const bool needs_summary)
 {
-    const auto target_duration = (target_traversed_in_reverse ? target_node.reverse_duration
-                                                              : target_node.forward_duration) /
-                                 10.;
+    const auto target_duration =
+        (target_traversed_in_reverse ? target_node.reverse_duration : target_node.forward_duration);
 
     auto distance = std::accumulate(
         leg_geometry.segment_distances.begin(), leg_geometry.segment_distances.end(), 0.);
-    auto duration = std::accumulate(route_data.begin(),
-                                    route_data.end(),
-                                    0.,
-                                    [](const double sum, const PathData &data) {
-                                        return sum + data.duration_until_turn;
-                                    }) /
-                    10.;
+    auto duration = std::accumulate(
+        route_data.begin(), route_data.end(), 0., [](const double sum, const PathData &data) {
+            return sum + data.duration_until_turn;
+        });
 
     //                 s
     //                 |
@@ -168,8 +164,7 @@ inline RouteLeg assembleLeg(const datafacade::BaseDataFacade &facade,
     if (route_data.empty())
     {
         duration -= (target_traversed_in_reverse ? source_node.reverse_duration
-                                                 : source_node.forward_duration) /
-                    10.0;
+                                                 : source_node.forward_duration);
     }
 
     std::string summary;
@@ -201,7 +196,7 @@ inline RouteLeg assembleLeg(const datafacade::BaseDataFacade &facade,
         summary = boost::algorithm::join(summary_names, ", ");
     }
 
-    return RouteLeg{duration, distance, summary, {}};
+    return RouteLeg{duration / 10., distance, summary, {}};
 }
 
 } // namespace guidance

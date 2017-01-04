@@ -241,9 +241,6 @@ unsigned EdgeBasedGraphFactory::RenumberEdges()
                 continue;
             }
 
-            // oneway streets always require this self-loop. Other streets only if a u-turn plus
-            // traversal
-            // of the street takes longer than the loop
             m_edge_based_node_weights.push_back(edge_data.weight);
 
             BOOST_ASSERT(numbered_edges_count < m_node_based_graph->GetNumberOfEdges());

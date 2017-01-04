@@ -319,7 +319,7 @@ class ContiguousInternalMemoryDataFacadeBase : public BaseDataFacade
             turn_weight_penalties_ptr,
             data_layout.num_entries[storage::DataLayout::TURN_WEIGHT_PENALTIES]);
         if (data_layout.num_entries[storage::DataLayout::TURN_DURATION_PENALTIES] == 0)
-        {
+        { // Fallback to turn weight penalties that are turn duration penalties in deciseconds
             m_turn_duration_penalties = util::ShM<TurnPenalty, true>::vector(
                 turn_weight_penalties_ptr,
                 data_layout.num_entries[storage::DataLayout::TURN_WEIGHT_PENALTIES]);

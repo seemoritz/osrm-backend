@@ -249,7 +249,7 @@ class RouteAPI : public BaseAPI
                 util::json::Object annotation;
                 annotation.values["distance"] = std::move(distances);
                 annotation.values["duration"] = std::move(durations);
-                annotation.values[facade.GetWeightName()] = std::move(weights);
+                annotation.values["weight"] = std::move(weights);
                 annotation.values["nodes"] = std::move(nodes);
                 annotation.values["datasources"] = std::move(datasources);
                 annotations.push_back(std::move(annotation));
