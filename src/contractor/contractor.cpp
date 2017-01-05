@@ -102,16 +102,17 @@ void GetNewWeight(IterType speed_iter,
                   EdgeWeight &new_segment_weight,
                   EdgeWeight &new_segment_duration)
 {
-    new_segment_duration =
-        (speed_iter->speed_source.speed > 0)
-            ? ConvertToDuration(segment_length, speed_iter->speed_source.speed)
-            : INVALID_EDGE_WEIGHT;
-    new_segment_weight =
-        (speed_iter->speed_source.weight != INVALID_EDGE_WEIGHT)
-            ? speed_iter->speed_source.weight
-            : new_segment_duration;
+    // Update the edge duration as distance/speed
+    new_segment_duration = (speed_iter->speed_source.speed > 0)
+                               ? ConvertToDuration(segment_length, speed_iter->speed_source.speed)
+                               : INVALID_EDGE_WEIGHT;
 
-    // the check here is enabled by the `--edge-weight-updates-over-factor` flag it logs a warning
+    // Update the edge weight or fallback to the new edge duration
+    new_segment_weight = (speed_iter->speed_source.weight != INVALID_EDGE_WEIGHT)
+                             ? speed_iter->speed_source.weight
+                             : new_segment_duration;
+
+    // The check here is enabled by the `--edge-weight-updates-over-factor` flag it logs a warning
     // if the new duration exceeds a heuristic of what a reasonable duration update is
     if (log_edge_updates_factor > 0 && current_duration != 0)
     {
@@ -639,18 +640,18 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
 
     // If we update the edge weights, this file will hold the datasource information for each
     // segment; the other files will also be conditionally filled concurrently if we make an update
-    std::vector<uint8_t> m_geometry_datasource;
+    std::vector<uint8_t> geometry_datasource;
 
     std::vector<extractor::QueryNode> internal_to_external_node_map;
-    std::vector<unsigned> m_geometry_indices;
-    std::vector<NodeID> m_geometry_node_list;
-    std::vector<EdgeWeight> m_geometry_fwd_weight_list;
-    std::vector<EdgeWeight> m_geometry_rev_weight_list;
-    std::vector<EdgeWeight> m_geometry_fwd_duration_list;
-    std::vector<EdgeWeight> m_geometry_rev_duration_list;
+    std::vector<unsigned> geometry_indices;
+    std::vector<NodeID> geometry_node_list;
+    std::vector<EdgeWeight> geometry_fwd_weight_list;
+    std::vector<EdgeWeight> geometry_rev_weight_list;
+    std::vector<EdgeWeight> geometry_fwd_duration_list;
+    std::vector<EdgeWeight> geometry_rev_duration_list;
 
     const auto maybe_load_internal_to_external_node_map = [&] {
-        if (!(update_edge_weights || update_turn_penalties))
+        if (!update_edge_weights)
             return;
 
         storage::io::FileReader nodes_file(nodes_filename,
@@ -661,34 +662,34 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
     };
 
     const auto maybe_load_geometries = [&] {
-        if (!(update_edge_weights || update_turn_penalties))
+        if (!update_edge_weights)
             return;
 
         storage::io::FileReader geometry_file(geometry_filename,
                                               storage::io::FileReader::HasNoFingerprint);
         const auto number_of_indices = geometry_file.ReadElementCount32();
-        m_geometry_indices.resize(number_of_indices);
-        geometry_file.ReadInto(m_geometry_indices.data(), number_of_indices);
+        geometry_indices.resize(number_of_indices);
+        geometry_file.ReadInto(geometry_indices.data(), number_of_indices);
 
         const auto number_of_compressed_geometries = geometry_file.ReadElementCount32();
 
-        BOOST_ASSERT(m_geometry_indices.back() == number_of_compressed_geometries);
-        m_geometry_node_list.resize(number_of_compressed_geometries);
-        m_geometry_fwd_weight_list.resize(number_of_compressed_geometries);
-        m_geometry_rev_weight_list.resize(number_of_compressed_geometries);
-        m_geometry_fwd_duration_list.resize(number_of_compressed_geometries);
-        m_geometry_rev_duration_list.resize(number_of_compressed_geometries);
+        BOOST_ASSERT(geometry_indices.back() == number_of_compressed_geometries);
+        geometry_node_list.resize(number_of_compressed_geometries);
+        geometry_fwd_weight_list.resize(number_of_compressed_geometries);
+        geometry_rev_weight_list.resize(number_of_compressed_geometries);
+        geometry_fwd_duration_list.resize(number_of_compressed_geometries);
+        geometry_rev_duration_list.resize(number_of_compressed_geometries);
 
         if (number_of_compressed_geometries > 0)
         {
-            geometry_file.ReadInto(m_geometry_node_list.data(), number_of_compressed_geometries);
-            geometry_file.ReadInto(m_geometry_fwd_weight_list.data(),
+            geometry_file.ReadInto(geometry_node_list.data(), number_of_compressed_geometries);
+            geometry_file.ReadInto(geometry_fwd_weight_list.data(),
                                    number_of_compressed_geometries);
-            geometry_file.ReadInto(m_geometry_rev_weight_list.data(),
+            geometry_file.ReadInto(geometry_rev_weight_list.data(),
                                    number_of_compressed_geometries);
-            geometry_file.ReadInto(m_geometry_fwd_duration_list.data(),
+            geometry_file.ReadInto(geometry_fwd_duration_list.data(),
                                    number_of_compressed_geometries);
-            geometry_file.ReadInto(m_geometry_rev_duration_list.data(),
+            geometry_file.ReadInto(geometry_rev_duration_list.data(),
                                    number_of_compressed_geometries);
         }
     };
@@ -699,7 +700,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                          maybe_load_internal_to_external_node_map,
                          maybe_load_geometries);
 
-    if (update_edge_weights || update_turn_penalties)
+    if (update_edge_weights)
     {
         // Here, we have to update the compressed geometry weights
         // First, we need the external-to-internal node lookup table
@@ -710,7 +711,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
         // CSV file that supplied the value that gets used for that segment, then
         // we write out this list so that it can be returned by the debugging
         // vector tiles later on.
-        m_geometry_datasource.resize(m_geometry_fwd_duration_list.size(), 0);
+        geometry_datasource.resize(geometry_fwd_duration_list.size(), 0);
 
         // Now, we iterate over all the segments stored in the StaticRTree, updating
         // the packed geometry weights in the `.geometries` file (note: we do not
@@ -743,16 +744,15 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                 extractor::QueryNode *u;
                 extractor::QueryNode *v;
 
-                const unsigned forward_begin =
-                    m_geometry_indices.at(leaf_object.packed_geometry_id);
+                const unsigned forward_begin = geometry_indices.at(leaf_object.packed_geometry_id);
                 const auto current_fwd_duration =
-                    m_geometry_fwd_duration_list[forward_begin + leaf_object.fwd_segment_position];
+                    geometry_fwd_duration_list[forward_begin + leaf_object.fwd_segment_position];
 
                 u = &(internal_to_external_node_map
-                          [m_geometry_node_list[forward_begin + leaf_object.fwd_segment_position]]);
-                v = &(internal_to_external_node_map
-                          [m_geometry_node_list[forward_begin + leaf_object.fwd_segment_position +
-                                                1]]);
+                          [geometry_node_list[forward_begin + leaf_object.fwd_segment_position]]);
+                v = &(
+                    internal_to_external_node_map
+                        [geometry_node_list[forward_begin + leaf_object.fwd_segment_position + 1]]);
 
                 const double segment_length = util::coordinate_calculation::greatCircleDistance(
                     util::Coordinate{u->lon, u->lat}, util::Coordinate{v->lon, v->lat});
@@ -770,13 +770,12 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                                  new_segment_weight,
                                  new_segment_duration);
 
-                    m_geometry_fwd_weight_list[forward_begin + 1 +
-                                               leaf_object.fwd_segment_position] =
+                    geometry_fwd_weight_list[forward_begin + 1 + leaf_object.fwd_segment_position] =
                         new_segment_weight;
-                    m_geometry_fwd_duration_list[forward_begin + 1 +
-                                                 leaf_object.fwd_segment_position] =
+                    geometry_fwd_duration_list[forward_begin + 1 +
+                                               leaf_object.fwd_segment_position] =
                         new_segment_duration;
-                    m_geometry_datasource[forward_begin + 1 + leaf_object.fwd_segment_position] =
+                    geometry_datasource[forward_begin + 1 + leaf_object.fwd_segment_position] =
                         forward_speed_iter->speed_source.source;
 
                     // count statistics for logging
@@ -789,7 +788,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                 }
 
                 const auto current_rev_duration =
-                    m_geometry_rev_duration_list[forward_begin + leaf_object.fwd_segment_position];
+                    geometry_rev_duration_list[forward_begin + leaf_object.fwd_segment_position];
 
                 const auto reverse_speed_iter = find(
                     segment_speed_lookup, SegmentSpeedSource{{v->node_id, u->node_id}, {0, 0, 0}});
@@ -805,11 +804,11 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                                  new_segment_weight,
                                  new_segment_duration);
 
-                    m_geometry_rev_weight_list[forward_begin + leaf_object.fwd_segment_position] =
+                    geometry_rev_weight_list[forward_begin + leaf_object.fwd_segment_position] =
                         new_segment_weight;
-                    m_geometry_rev_duration_list[forward_begin + leaf_object.fwd_segment_position] =
+                    geometry_rev_duration_list[forward_begin + leaf_object.fwd_segment_position] =
                         new_segment_duration;
-                    m_geometry_datasource[forward_begin + leaf_object.fwd_segment_position] =
+                    geometry_datasource[forward_begin + leaf_object.fwd_segment_position] =
                         reverse_speed_iter->speed_source.source;
 
                     // count statistics for logging
@@ -849,7 +848,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
     }
 
     const auto maybe_save_geometries = [&] {
-        if (!(update_edge_weights || update_turn_penalties))
+        if (!update_edge_weights)
             return;
 
         // Now save out the updated compressed geometries
@@ -859,22 +858,22 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
             const std::string message{"Failed to open " + geometry_filename + " for writing"};
             throw util::exception(message + SOURCE_REF);
         }
-        const unsigned number_of_indices = m_geometry_indices.size();
-        const unsigned number_of_compressed_geometries = m_geometry_node_list.size();
+        const unsigned number_of_indices = geometry_indices.size();
+        const unsigned number_of_compressed_geometries = geometry_node_list.size();
         geometry_stream.write(reinterpret_cast<const char *>(&number_of_indices), sizeof(unsigned));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_indices[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_indices[0])),
                               number_of_indices * sizeof(unsigned));
         geometry_stream.write(reinterpret_cast<const char *>(&number_of_compressed_geometries),
                               sizeof(unsigned));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_node_list[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_node_list[0])),
                               number_of_compressed_geometries * sizeof(NodeID));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_fwd_weight_list[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_fwd_weight_list[0])),
                               number_of_compressed_geometries * sizeof(EdgeWeight));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_rev_weight_list[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_rev_weight_list[0])),
                               number_of_compressed_geometries * sizeof(EdgeWeight));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_fwd_duration_list[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_fwd_duration_list[0])),
                               number_of_compressed_geometries * sizeof(EdgeWeight));
-        geometry_stream.write(reinterpret_cast<char *>(&(m_geometry_rev_duration_list[0])),
+        geometry_stream.write(reinterpret_cast<char *>(&(geometry_rev_duration_list[0])),
                               number_of_compressed_geometries * sizeof(EdgeWeight));
     };
 
@@ -886,12 +885,12 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
                                       " for writing"};
             throw util::exception(message + SOURCE_REF);
         }
-        std::uint64_t number_of_datasource_entries = m_geometry_datasource.size();
+        std::uint64_t number_of_datasource_entries = geometry_datasource.size();
         datasource_stream.write(reinterpret_cast<const char *>(&number_of_datasource_entries),
                                 sizeof(number_of_datasource_entries));
         if (number_of_datasource_entries > 0)
         {
-            datasource_stream.write(reinterpret_cast<char *>(&(m_geometry_datasource[0])),
+            datasource_stream.write(reinterpret_cast<char *>(&(geometry_datasource[0])),
                                     number_of_datasource_entries * sizeof(uint8_t));
         }
     };

@@ -635,7 +635,7 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
         }
     }
 
-    // write out the weight penalties per turn
+    // write weight penalties per turn
     std::ofstream turn_weight_penalties_file(turn_weight_penalties_filename.c_str(),
                                              std::ios::binary);
     lookup::TurnPenaltiesHeader turn_weight_penalties_header{turn_weight_penalties.size()};
@@ -644,7 +644,9 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
     turn_weight_penalties_file.write(reinterpret_cast<const char *>(turn_weight_penalties.data()),
                                      sizeof(decltype(turn_weight_penalties)::value_type) *
                                          turn_weight_penalties.size());
-    // write out the duration penatlies per durn if we need them
+
+    // write duration penalties per turn if we need them
+    BOOST_ASSERT(!profile_properties.fallback_to_duration || turn_duration_penalties.size() == 0);
     std::ofstream turn_duration_penalties_file(turn_duration_penalties_filename.c_str(),
                                                std::ios::binary);
     lookup::TurnPenaltiesHeader turn_duration_penalties_header{turn_duration_penalties.size()};
