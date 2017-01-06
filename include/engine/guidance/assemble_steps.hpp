@@ -104,7 +104,6 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
             // all changes to this check have to be matched with assemble_geometry
             if (path_point.turn_instruction.type != extractor::guidance::TurnType::NoTurn)
             {
-                BOOST_ASSERT(segment_duration >= 0);
                 BOOST_ASSERT(segment_weight >= 0);
                 const auto name = facade.GetNameForID(step_name_id);
                 const auto ref = facade.GetRefForID(step_name_id);

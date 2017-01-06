@@ -260,7 +260,8 @@ struct Turn final
 
 struct PenaltySource final
 {
-    double penalty;
+    double duration;
+    TurnPenalty weight;
     std::uint8_t source;
 };
 struct TurnPenaltySource final
@@ -431,7 +432,8 @@ parse_turn_penalty_lookup_from_csv_files(const std::vector<std::string> &turn_pe
                 std::uint64_t from_node_id{};
                 std::uint64_t via_node_id{};
                 std::uint64_t to_node_id{};
-                double penalty{};
+                double duration{};
+                TurnPenalty weight = INVALID_TURN_PENALTY;
 
                 auto it = begin(line);
                 const auto last = end(line);
@@ -440,11 +442,12 @@ parse_turn_penalty_lookup_from_csv_files(const std::vector<std::string> &turn_pe
                 const auto ok = parse(it,
                                       last, //
                                       (ulong_long >> ',' >> ulong_long >> ',' >> ulong_long >>
-                                       ',' >> double_ >> *(',' >> *char_)), //
+                                       ',' >> double_ >> -(',' >> int_) >> *(',' >> *char_)), //
                                       from_node_id,
                                       via_node_id,
                                       to_node_id,
-                                      penalty); //
+                                      duration,
+                                      weight);
 
                 if (!ok || it != last)
                 {
@@ -455,7 +458,7 @@ parse_turn_penalty_lookup_from_csv_files(const std::vector<std::string> &turn_pe
 
                 TurnPenaltySource val{
                     {OSMNodeID{from_node_id}, OSMNodeID{via_node_id}, OSMNodeID{to_node_id}},
-                    {penalty, static_cast<std::uint8_t>(file_id)}};
+                    {duration, weight, static_cast<std::uint8_t>(file_id)}};
                 local.push_back(std::move(val));
             });
 
@@ -555,20 +558,6 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
     const bool update_edge_weights = !segment_speed_filenames.empty();
     const bool update_turn_penalties = !turn_penalty_filenames.empty();
 
-    const auto turn_weight_penalties_region = [&] {
-        if (update_edge_weights || update_turn_penalties)
-        {
-            return mmap_file(turn_weight_penalties_filename, boost::interprocess::read_write);
-        }
-        return boost::interprocess::mapped_region();
-    }();
-    const auto turn_duration_penalties_region = [&] {
-        if (update_edge_weights || update_turn_penalties)
-        {
-            return mmap_file(turn_duration_penalties_filename, boost::interprocess::read_only);
-        }
-        return boost::interprocess::mapped_region();
-    }();
     const auto turn_penalties_index_region = [&] {
         if (update_edge_weights || update_turn_penalties)
         {
@@ -916,35 +905,62 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
 
     tbb::parallel_invoke(maybe_save_geometries, save_datasource_indexes, save_datastore_names);
 
-    auto turn_weight_penalty_ptr = reinterpret_cast<TurnPenalty *>(
-        reinterpret_cast<char *>(turn_weight_penalties_region.get_address()) +
-        sizeof(extractor::lookup::TurnPenaltiesHeader));
-    BOOST_ASSERT(is_aligned<extractor::lookup::TurnPenaltiesHeader>(turn_weight_penalty_ptr));
+    std::vector<TurnPenalty> turn_weight_penalties;
+    std::vector<TurnPenalty> turn_duration_penalties;
 
-    // TODO MKR auto turn_duration_penalty_ptr = reinterpret_cast<TurnPenalty *>(
-    //     reinterpret_cast<char *>(turn_duration_penalties_region.get_address()) +
-    //     sizeof(extractor::lookup:TurnPenaltiesHeader));
-    auto turn_index_block_ptr = reinterpret_cast<const extractor::lookup::TurnIndexBlock *>(
-        turn_penalties_index_region.get_address());
-    BOOST_ASSERT(is_aligned<extractor::lookup::TurnIndexBlock>(turn_index_block_ptr));
+    const auto maybe_load_turn_weight_penalties = [&] {
+        if (!update_edge_weights && !update_turn_penalties)
+            return;
+        using storage::io::FileReader;
+        FileReader file(turn_weight_penalties_filename, FileReader::HasNoFingerprint);
+        file.DeserializeVector(turn_weight_penalties);
+    };
 
-    auto edge_based_edge_ptr = reinterpret_cast<extractor::EdgeBasedEdge *>(
+    const auto maybe_load_turn_duration_penalties = [&] {
+        if (!update_turn_penalties)
+            return;
+        using storage::io::FileReader;
+        FileReader file(turn_duration_penalties_filename, FileReader::HasNoFingerprint);
+        file.DeserializeVector(turn_duration_penalties);
+    };
+
+    tbb::parallel_invoke(maybe_load_turn_weight_penalties, maybe_load_turn_duration_penalties);
+
+    if (update_turn_penalties && turn_duration_penalties.empty())
+    { // Copy-on-write for duration penalties as turn weight penalties
+        turn_duration_penalties = turn_weight_penalties;
+    }
+
+    // Mapped file pointer for turn indices
+    const extractor::lookup::TurnIndexBlock *turn_index_blocks =
+        reinterpret_cast<const extractor::lookup::TurnIndexBlock *>(
+            turn_penalties_index_region.get_address());
+    // BOOST_ASSERT(turn_index_blocks);
+    BOOST_ASSERT(is_aligned<extractor::lookup::TurnIndexBlock>(turn_index_blocks));
+    // BOOST_ASSERT(turn_weight_penalties.size() == turn_duration_penalties.size());
+    // BOOST_ASSERT(turn_weight_penalties.size() == turn_penalties_index_region.get_size() /
+    // sizeof(extractor::lookup::TurnIndexBlock));
+
+    // Mapped file pointers for edge-based graph edges
+    auto edge_based_edge_ptr = reinterpret_cast<const extractor::EdgeBasedEdge *>(
         reinterpret_cast<char *>(edge_based_graph_region.get_address()) +
         sizeof(EdgeBasedGraphHeader));
     BOOST_ASSERT(is_aligned<extractor::EdgeBasedEdge>(edge_based_edge_ptr));
 
-    const auto edge_based_edge_last = reinterpret_cast<extractor::EdgeBasedEdge *>(
+    auto edge_based_edge_last = reinterpret_cast<const extractor::EdgeBasedEdge *>(
         reinterpret_cast<char *>(edge_based_graph_region.get_address()) +
         sizeof(EdgeBasedGraphHeader) +
         sizeof(extractor::EdgeBasedEdge) * graph_header.number_of_edges);
 
+    // Mapped file pointer for edge-based graph segments
     auto edge_segment_byte_ptr = reinterpret_cast<const char *>(edge_segment_region.get_address());
 
+    bool fallback_to_duration = true;
+    std::size_t edge_index = 0;
     while (edge_based_edge_ptr != edge_based_edge_last)
     {
         // Make a copy of the data from the memory map
-        extractor::EdgeBasedEdge inbuffer = *edge_based_edge_ptr;
-        edge_based_edge_ptr++;
+        extractor::EdgeBasedEdge inbuffer = *edge_based_edge_ptr++;
 
         if (update_edge_weights || update_turn_penalties)
         {
@@ -1008,53 +1024,69 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
             // effectively removes it from the routing network.
             if (skip_this_edge)
             {
-                turn_index_block_ptr++;
-                turn_weight_penalty_ptr++;
-                // TODO MKR turn_duration_penalty_ptr++;
+                ++edge_index;
                 continue;
             }
 
-            auto turn_weight_penalty = *turn_weight_penalty_ptr;
-            // TODO MKR auto turn_duration_penalty = *turn_duration_penalty_ptr;
-
-            const auto turn_iter = find(turn_penalty_lookup,
-                                        TurnPenaltySource{{turn_index_block_ptr->from_id,
-                                                           turn_index_block_ptr->via_id,
-                                                           turn_index_block_ptr->to_id},
-                                                          {0, 0}});
-            if (turn_iter != turn_penalty_lookup.end())
+            auto turn_weight_penalty = turn_weight_penalties[edge_index];
+            if (update_turn_penalties)
             {
-                auto turn_weight_penalty_100ms = turn_iter->penalty_source.penalty * 10;
-                if (turn_weight_penalty_100ms + new_weight < compressed_edge_nodes)
-                {
-                    util::Log(logWARNING) << "turn penalty " << turn_iter->penalty_source.penalty
-                                          << " for turn " << turn_index_block_ptr->from_id << ", "
-                                          << turn_index_block_ptr->via_id << ", "
-                                          << turn_index_block_ptr->to_id
-                                          << " is too negative: clamping turn weight to "
-                                          << (compressed_edge_nodes - new_weight);
+                auto turn_duration_penalty = turn_duration_penalties[edge_index];
+                const auto &turn_index = turn_index_blocks[edge_index];
 
-                    turn_weight_penalty =
-                        boost::numeric_cast<TurnPenalty>(compressed_edge_nodes - new_weight);
-                }
-                else
+                const auto turn_iter =
+                    find(turn_penalty_lookup,
+                         TurnPenaltySource{
+                             {turn_index.from_id, turn_index.via_id, turn_index.to_id}, {0, 0, 0}});
+
+                if (turn_iter != turn_penalty_lookup.end())
                 {
-                    turn_weight_penalty =
-                        boost::numeric_cast<TurnPenalty>(turn_weight_penalty_100ms);
+                    turn_duration_penalty =
+                        static_cast<TurnPenalty>(turn_iter->penalty_source.duration * 10);
+                    turn_weight_penalty = turn_iter->penalty_source.weight == INVALID_TURN_PENALTY
+                                              ? turn_duration_penalty
+                                              : turn_iter->penalty_source.weight;
+
+                    if (turn_weight_penalty + new_weight < compressed_edge_nodes)
+                    {
+                        util::Log(logWARNING) << "turn penalty " << turn_weight_penalty
+                                              << " for turn " << turn_index.from_id << ", "
+                                              << turn_index.via_id << ", " << turn_index.to_id
+                                              << " is too negative: clamping turn weight to "
+                                              << (compressed_edge_nodes - new_weight);
+
+                        turn_weight_penalty = compressed_edge_nodes - new_weight;
+                    }
                 }
+
+                turn_duration_penalties[edge_index] = turn_duration_penalty;
+                turn_weight_penalties[edge_index] = turn_weight_penalty;
+                fallback_to_duration &= (turn_duration_penalty == turn_weight_penalty);
             }
 
-            inbuffer.weight = turn_weight_penalty + new_weight;
-            // FIXME update the turn penalty
-            *turn_weight_penalty_ptr = turn_weight_penalty;
-
-            // Increment pointers
-            turn_index_block_ptr++;
-            turn_weight_penalty_ptr++;
-            // TODO MKR turn_duration_penalty_ptr++;
+            inbuffer.weight = new_weight + turn_weight_penalty;
         }
 
         edge_based_edge_list.emplace_back(std::move(inbuffer));
+        ++edge_index;
+    }
+
+    if (update_turn_penalties)
+    {
+        if (fallback_to_duration)
+        { // Turn duration penalties are identical to turn weight penalties
+            // Save empty data vector, so turn weight penalties will be used by data facade.
+            turn_duration_penalties.clear();
+        }
+
+        const auto save_penalties = [](const auto &filename, const auto &data) -> void {
+            storage::io::FileWriter file(filename, storage::io::FileWriter::HasNoFingerprint);
+            file.SerializeVector(data);
+        };
+
+        tbb::parallel_invoke(
+            [&] { save_penalties(turn_weight_penalties_filename, turn_weight_penalties); },
+            [&] { save_penalties(turn_duration_penalties_filename, turn_duration_penalties); });
     }
 
     util::Log() << "Done reading edges";

@@ -37,14 +37,14 @@ Feature: Traffic - turn penalties applied to turn onto which a phantom node snap
         Given the turn penalty file
             """
             1,2,5,0,comment
-            3,4,7,-20
+            3,4,7,-30
             """
         And the contract extra arguments "--turn-penalty-file {penalties_file}"
         When I route I should get
-            | from | to | route    | speed   | time    |
-            | a    | e  | ab,be,be | 36 km/h | 40s +-1 |
-            | 1    | e  | ab,be,be | 36 km/h | 30s +-1 |
-            | b    | f  | bc,cf,cf | 36 km/h | 40s +-1 |
-            | 2    | f  | bc,cf,cf | 36 km/h | 30s +-1 |
-            | c    | g  | cd,dg,dg | 71 km/h | 20s +-1 |
-            | 3    | g  | cd,dg,dg | 54 km/h | 20s +-1 |
+            | from | to | route    | speed    | time    |
+            | a    | e  | ab,be,be | 36 km/h  | 40s +-1 |
+            | 1    | e  | ab,be,be | 36 km/h  | 30s +-1 |
+            | b    | f  | bc,cf,cf | 36 km/h  | 40s +-1 |
+            | 2    | f  | bc,cf,cf | 36 km/h  | 30s +-1 |
+            | c    | g  | cd,dg,dg | 144 km/h | 10s +-1 |
+            | 3    | g  | cd,dg,dg | 54 km/h  | 20s +-1 |
