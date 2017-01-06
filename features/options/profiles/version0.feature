@@ -72,7 +72,7 @@ end
 
 function turn_function (angle)
   print('turn_function ' .. angle)
-  return angle == 0 and 0 or 42
+  return angle == 0 and 0 or 1.7
 end
 
 function segment_function (source, target, distance, weight)
@@ -102,6 +102,6 @@ end
 
         When I route I should get
            | from | to | route    | time  |
-           | a    | b  | ac,cb,cb | 19.2s |
-           | a    | d  | ac,cd,cd | 19.2s |
+           | a    | b  | ac,cb,cb | 16.7s |
+           | a    | d  | ac,cd,cd | 16.7s |
            | a    | e  | ac,ce,ce | 20s   |

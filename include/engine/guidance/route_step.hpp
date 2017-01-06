@@ -66,7 +66,7 @@ struct RouteStep
     std::string rotary_pronunciation;
     double duration; // duration in seconds
     double distance; // distance in meters
-    EdgeWeight weight;
+    double weight;   // weight value (0.1 precision)
     extractor::TravelMode mode;
     StepManeuver maneuver;
     // indices into the locations array stored the LegGeometry

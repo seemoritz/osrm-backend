@@ -114,8 +114,8 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
         [&input_way](const double by_way, const double by_meter) -> detail::ByEdgeOrByMeterValue {
         if (by_way > 0)
         {
-            // FIXME We devide by the numer of edges here, but should rather consider
-            // the length of each segment. We would eigther have to compute the length
+            // FIXME We divide by the number of edges here, but should rather consider
+            // the length of each segment. We would either have to compute the length
             // of the whole way here (we can't: no node coordinates) or push that back
             // to the container and keep a reference to the way.
             const unsigned num_edges = (input_way.nodes().size() - 1);
@@ -145,9 +145,6 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
     }
     if (parsed_way.backward_travel_mode != TRAVEL_MODE_INACCESSIBLE)
     {
-        // TODO ???
-        // util::Log(logDEBUG) << "found way with bogus speed, id: " << input_way.id();
-        // return;
         BOOST_ASSERT(parsed_way.duration > 0 || parsed_way.backward_speed > 0);
         backward_duration_data =
             toValueByEdgeOrByMeter(parsed_way.duration, parsed_way.backward_speed / 3.6);
@@ -312,11 +309,18 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
         name_id = name_iterator->second;
     }
 
+    const bool in_forward_direction =
+        (parsed_way.forward_speed > 0 || parsed_way.forward_weight_per_meter > 0 ||
+         parsed_way.duration > 0 || parsed_way.weight > 0) &&
+        (parsed_way.forward_travel_mode != TRAVEL_MODE_INACCESSIBLE);
+
+    const bool in_backward_direction =
+        (parsed_way.backward_speed > 0 || parsed_way.backward_weight_per_meter > 0 ||
+         parsed_way.duration > 0 || parsed_way.weight > 0) &&
+        (parsed_way.backward_travel_mode != TRAVEL_MODE_INACCESSIBLE);
+
     const bool split_edge =
-        (parsed_way.forward_speed > 0) &&
-        (TRAVEL_MODE_INACCESSIBLE != parsed_way.forward_travel_mode) &&
-        (parsed_way.backward_speed > 0) &&
-        (TRAVEL_MODE_INACCESSIBLE != parsed_way.backward_travel_mode) &&
+        in_forward_direction && in_backward_direction &&
         ((parsed_way.forward_weight_per_meter != parsed_way.backward_weight_per_meter) ||
          (parsed_way.forward_speed != parsed_way.backward_speed) ||
          (parsed_way.forward_travel_mode != parsed_way.backward_travel_mode) ||
@@ -332,10 +336,8 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
                        return OSMNodeID{static_cast<std::uint64_t>(ref.ref())};
                    });
 
-    const bool is_opposite_way = TRAVEL_MODE_INACCESSIBLE == parsed_way.forward_travel_mode;
-
     // traverse way in reverse in this case
-    if (is_opposite_way)
+    if (!in_forward_direction)
     {
         BOOST_ASSERT(split_edge == false);
         BOOST_ASSERT(parsed_way.backward_travel_mode != TRAVEL_MODE_INACCESSIBLE);

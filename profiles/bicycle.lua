@@ -96,7 +96,7 @@ properties.max_speed_for_map_matching    = 110/3.6 -- kmph -> m/s
 properties.use_turn_restrictions         = false
 properties.continue_straight_at_waypoint = false
 properties.weight_name                   = 'duration'
---properties.weight_name                   = 'cyclebiliyt'
+--properties.weight_name                   = 'cyclability'
 
 local obey_oneway               = true
 local ignore_areas              = true
@@ -398,7 +398,7 @@ function way_function (way, result)
   -- maxspeed
   limit( result, maxspeed, maxspeed_forward, maxspeed_backward )
 
-  -- convert duration into cyclebility
+  -- convert duration into cyclability
   local is_unsafe = safety_penalty < 1 and unsafe_highway_list[highway]
   if result.forward_speed > 0 then
     -- convert from km/h to m/s

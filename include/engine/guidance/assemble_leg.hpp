@@ -135,7 +135,7 @@ inline RouteLeg assembleLeg(const datafacade::BaseDataFacade &facade,
     auto distance = std::accumulate(
         leg_geometry.segment_distances.begin(), leg_geometry.segment_distances.end(), 0.);
     auto duration = std::accumulate(
-        route_data.begin(), route_data.end(), 0., [](const double sum, const PathData &data) {
+        route_data.begin(), route_data.end(), 0, [](const double sum, const PathData &data) {
             return sum + data.duration_until_turn;
         });
 

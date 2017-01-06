@@ -141,9 +141,9 @@ Feature: Basic Map Matching
         And the contract extra arguments "--segment-speed-file {speeds_file}"
 
         When I match I should get
-            | trace | matchings | annotation                                                                                                           |
-            | abeh  | abeh      | 10:1:9.897633:1,0:0:0:0,10:1:10.008842:0,10:1:10.008842:0,10:1:10.008842:0,0:0:0:0,20:2:20.017685:0,10:1:10.008842:0 |
-            | abci  | abci      | 10:1:9.897633:1,0:0:0:0,10:1:10.008842:0,0:0:0.111209:0,10:1:10.010367:0                                             |
+            | trace | matchings | annotation                                                                                                     |
+            | abeh  | abeh      | 1:1:9.897633:1,0:0:0:0,1:1:10.008842:0,1:1:10.008842:0,1:1:10.008842:0,0:0:0:0,2:2:20.017685:0,1:1:10.008842:0 |
+            | abci  | abci      | 1:1:9.897633:1,0:0:0:0,1:1:10.008842:0,0:0:0.111209:0,1:1:10.010367:0                                          |
 
         # The following is the same as the above, but separated for readability (line length)
         When I match I should get

@@ -89,7 +89,7 @@ inline EdgeWeight ConvertToDuration(double distance_in_meters, double speed_in_k
     BOOST_ASSERT(speed_in_kmh > 0);
     const double speed_in_ms = speed_in_kmh / 3.6;
     const double duration = distance_in_meters / speed_in_ms;
-    return std::max<EdgeWeight>(1, static_cast<EdgeWeight>(std::round(duration * 10)));
+    return std::max<EdgeWeight>(1, static_cast<EdgeWeight>(std::round(duration * 10.)));
 }
 
 // Returns updated edge weight
@@ -108,9 +108,9 @@ void GetNewWeight(IterType speed_iter,
                                : INVALID_EDGE_WEIGHT;
 
     // Update the edge weight or fallback to the new edge duration
-    new_segment_weight = (speed_iter->speed_source.weight != INVALID_EDGE_WEIGHT)
-                             ? speed_iter->speed_source.weight
-                             : new_segment_duration;
+    new_segment_weight = (speed_iter->speed_source.weight == INVALID_EDGE_WEIGHT)
+                             ? new_segment_duration
+                             : speed_iter->speed_source.weight;
 
     // The check here is enabled by the `--edge-weight-updates-over-factor` flag it logs a warning
     // if the new duration exceeds a heuristic of what a reasonable duration update is
@@ -118,8 +118,8 @@ void GetNewWeight(IterType speed_iter,
     {
         if (current_duration >= (new_segment_duration * log_edge_updates_factor))
         {
-            auto new_secs = new_segment_duration / 10.0;
-            auto old_secs = current_duration / 10.0;
+            auto new_secs = new_segment_duration / 10.;
+            auto old_secs = current_duration / 10.;
             auto approx_original_speed = (segment_length / old_secs) * 3.6;
             auto speed_file = segment_speed_filenames.at(speed_iter->speed_source.source - 1);
             util::Log(logWARNING) << "[weight updates] Edge weight update from " << old_secs
@@ -261,7 +261,7 @@ struct Turn final
 struct PenaltySource final
 {
     double duration;
-    TurnPenalty weight;
+    double weight;
     std::uint8_t source;
 };
 struct TurnPenaltySource final
@@ -433,7 +433,7 @@ parse_turn_penalty_lookup_from_csv_files(const std::vector<std::string> &turn_pe
                 std::uint64_t via_node_id{};
                 std::uint64_t to_node_id{};
                 double duration{};
-                TurnPenalty weight = INVALID_TURN_PENALTY;
+                auto weight = std::numeric_limits<double>::quiet_NaN();
 
                 auto it = begin(line);
                 const auto last = end(line);
@@ -442,7 +442,7 @@ parse_turn_penalty_lookup_from_csv_files(const std::vector<std::string> &turn_pe
                 const auto ok = parse(it,
                                       last, //
                                       (ulong_long >> ',' >> ulong_long >> ',' >> ulong_long >>
-                                       ',' >> double_ >> -(',' >> int_) >> *(',' >> *char_)), //
+                                       ',' >> double_ >> -(',' >> double_) >> *(',' >> *char_)), //
                                       from_node_id,
                                       via_node_id,
                                       to_node_id,
@@ -935,11 +935,7 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
     const extractor::lookup::TurnIndexBlock *turn_index_blocks =
         reinterpret_cast<const extractor::lookup::TurnIndexBlock *>(
             turn_penalties_index_region.get_address());
-    // BOOST_ASSERT(turn_index_blocks);
     BOOST_ASSERT(is_aligned<extractor::lookup::TurnIndexBlock>(turn_index_blocks));
-    // BOOST_ASSERT(turn_weight_penalties.size() == turn_duration_penalties.size());
-    // BOOST_ASSERT(turn_weight_penalties.size() == turn_penalties_index_region.get_size() /
-    // sizeof(extractor::lookup::TurnIndexBlock));
 
     // Mapped file pointers for edge-based graph edges
     auto edge_based_edge_ptr = reinterpret_cast<const extractor::EdgeBasedEdge *>(
@@ -1041,11 +1037,13 @@ EdgeID Contractor::LoadEdgeExpandedGraph(
 
                 if (turn_iter != turn_penalty_lookup.end())
                 {
+                    const auto &penalty = turn_iter->penalty_source;
                     turn_duration_penalty =
-                        static_cast<TurnPenalty>(turn_iter->penalty_source.duration * 10);
-                    turn_weight_penalty = turn_iter->penalty_source.weight == INVALID_TURN_PENALTY
-                                              ? turn_duration_penalty
-                                              : turn_iter->penalty_source.weight;
+                        static_cast<TurnPenalty>(std::round(penalty.duration * 10.));
+                    turn_weight_penalty =
+                        std::isnan(penalty.weight)
+                            ? turn_duration_penalty
+                            : static_cast<TurnPenalty>(std::round(penalty.weight * 10.));
 
                     if (turn_weight_penalty + new_weight < compressed_edge_nodes)
                     {

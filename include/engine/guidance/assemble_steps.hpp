@@ -41,8 +41,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                             const bool source_traversed_in_reverse,
                                             const bool target_traversed_in_reverse)
 {
-    const double constexpr ZERO_DURATION = 0., ZERO_DISTANCE = 0.;
-    const EdgeWeight ZERO_WEIGHT = 0;
+    const double constexpr ZERO_DURATION = 0., ZERO_DISTANCE = 0., ZERO_WEIGHT = 0;
     const constexpr char *NO_ROTARY_NAME = "";
     const EdgeWeight source_weight =
         source_traversed_in_reverse ? source_node.reverse_weight : source_node.forward_weight;
@@ -118,9 +117,9 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                           std::move(destinations),
                                           NO_ROTARY_NAME,
                                           NO_ROTARY_NAME,
-                                          segment_duration / 10.0,
+                                          segment_duration / 10.,
                                           distance,
-                                          segment_weight,
+                                          segment_weight / 10.,
                                           path_point.travel_mode,
                                           maneuver,
                                           leg_geometry.FrontIndex(segment_index),
@@ -197,7 +196,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   distance,
-                                  weight,
+                                  weight / 10.,
                                   target_mode,
                                   maneuver,
                                   leg_geometry.FrontIndex(segment_index),
@@ -226,7 +225,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   leg_geometry.segment_distances[segment_index],
-                                  weight,
+                                  weight / 10.,
                                   source_mode,
                                   std::move(maneuver),
                                   leg_geometry.FrontIndex(segment_index),

@@ -527,9 +527,10 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
 
                     // turn penalties are limited to [-2^15, 2^15) which roughly
                     // translates to 54 minutes and fits signed 16bit deci-seconds
-                    auto weight_penalty = boost::numeric_cast<TurnPenalty>(extracted_turn.weight);
+                    auto weight_penalty =
+                        boost::numeric_cast<TurnPenalty>(extracted_turn.weight * 10.);
                     auto duration_penalty =
-                        boost::numeric_cast<TurnPenalty>(extracted_turn.duration);
+                        boost::numeric_cast<TurnPenalty>(extracted_turn.duration * 10.);
 
                     BOOST_ASSERT(SPECIAL_NODEID != edge_data1.edge_id);
                     BOOST_ASSERT(SPECIAL_NODEID != edge_data2.edge_id);

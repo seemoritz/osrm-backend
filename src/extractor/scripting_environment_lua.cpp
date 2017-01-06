@@ -574,9 +574,6 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
         case 1:
             turn_function(turn);
 
-            // Convert duration penalty seconds to deciseconds
-            turn.duration *= 10.;
-
             // Turn weight falls back to the duration value in deciseconds
             // or uses the extracted unit-less weight value
             if (context.properties.fallback_to_duration)
@@ -625,7 +622,8 @@ void Sol2ScriptingEnvironment::ProcessSegment(ExtractionSegment &segment)
             segment_function(segment);
             break;
         case 0:
-            segment_function(segment.source, segment.target, segment.distance, segment.weight);
+            segment_function(segment.source, segment.target, segment.distance, segment.duration);
+            segment.weight = segment.duration; // back-compatibility fallback to duration
             break;
         }
     }

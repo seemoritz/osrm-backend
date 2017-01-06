@@ -39,7 +39,7 @@ struct LegGeometry
     {
         double distance; // distance in meters
         double duration; // duration in seconds
-        EdgeWeight weight;
+        double weight;   // weight value (0.1 precision)
         DatasourceID datasource;
     };
     std::vector<Annotation> annotations;
