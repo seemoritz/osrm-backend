@@ -242,6 +242,8 @@ void Sol2ScriptingEnvironment::InitContext(LuaScriptingContext &context)
         &ProfileProperties::use_turn_restrictions,
         "left_hand_driving",
         &ProfileProperties::left_hand_driving,
+        "weight_precision",
+        &ProfileProperties::weight_precision,
         "weight_name",
         sol::property(&ProfileProperties::SetWeightName, &ProfileProperties::GetWeightName));
 

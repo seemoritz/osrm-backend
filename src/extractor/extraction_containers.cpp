@@ -391,6 +391,8 @@ void ExtractionContainers::PrepareEdges(ScriptingEnvironment &scripting_environm
         const auto all_edges_list_end_ = all_edges_list.end();
         const auto all_nodes_list_end_ = all_nodes_list.end();
 
+        auto weight_multiplier = std::pow(10, scripting_environment.GetProfileProperties().weight_precision);
+
         while (edge_iterator != all_edges_list_end_ && node_iterator != all_nodes_list_end_)
         {
             // skip all invalid edges
@@ -434,7 +436,7 @@ void ExtractionContainers::PrepareEdges(ScriptingEnvironment &scripting_environm
             scripting_environment.ProcessSegment(extracted_segment);
 
             auto &edge = edge_iterator->result;
-            edge.weight = std::max<EdgeWeight>(1, std::round(extracted_segment.weight * 10.));
+            edge.weight = std::max<EdgeWeight>(1, std::round(extracted_segment.weight * weight_multiplier));
             edge.duration = std::max<EdgeWeight>(1, std::round(extracted_segment.duration * 10.));
 
             // assign new node id

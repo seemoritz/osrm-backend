@@ -41,6 +41,8 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                             const bool source_traversed_in_reverse,
                                             const bool target_traversed_in_reverse)
 {
+    const double weight_multiplier = std::pow(10., facade.GetWeightPrecision());
+
     const double constexpr ZERO_DURATION = 0., ZERO_DISTANCE = 0., ZERO_WEIGHT = 0;
     const constexpr char *NO_ROTARY_NAME = "";
     const EdgeWeight source_weight =
@@ -119,7 +121,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                           NO_ROTARY_NAME,
                                           segment_duration / 10.,
                                           distance,
-                                          segment_weight / 10.,
+                                          segment_weight / weight_multiplier,
                                           path_point.travel_mode,
                                           maneuver,
                                           leg_geometry.FrontIndex(segment_index),
@@ -196,7 +198,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   distance,
-                                  weight / 10.,
+                                  weight / weight_multiplier,
                                   target_mode,
                                   maneuver,
                                   leg_geometry.FrontIndex(segment_index),
@@ -225,7 +227,7 @@ inline std::vector<RouteStep> assembleSteps(const datafacade::BaseDataFacade &fa
                                   NO_ROTARY_NAME,
                                   duration / 10.,
                                   leg_geometry.segment_distances[segment_index],
-                                  weight / 10.,
+                                  weight / weight_multiplier,
                                   source_mode,
                                   std::move(maneuver),
                                   leg_geometry.FrontIndex(segment_index),

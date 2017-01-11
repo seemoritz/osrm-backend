@@ -80,6 +80,7 @@ struct ProfileProperties
     bool fallback_to_duration;
     //! stores the name of the weight (e.g. 'duration', 'distance', 'safety')
     char weight_name[MAX_WEIGHT_NAME_LENGTH + 1];
+    unsigned weight_precision = 1;
 };
 }
 }
