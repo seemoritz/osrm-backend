@@ -87,8 +87,8 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
          parsed_way.backward_travel_mode == TRAVEL_MODE_INACCESSIBLE) ||
         (parsed_way.forward_speed <= 0 && parsed_way.backward_speed <= 0 &&
          parsed_way.duration <= 0) ||
-        (!fallback_to_duration && parsed_way.forward_rate <= 0 &&
-         parsed_way.backward_rate <= 0 && parsed_way.weight <= 0))
+        (!fallback_to_duration && parsed_way.forward_rate <= 0 && parsed_way.backward_rate <= 0 &&
+         parsed_way.weight <= 0))
     { // Only true if the way is specified by the speed profile
         return;
     }
@@ -307,21 +307,20 @@ void ExtractorCallbacks::ProcessWay(const osmium::Way &input_way, const Extracti
     }
 
     const bool in_forward_direction =
-        (parsed_way.forward_speed > 0 || parsed_way.forward_rate > 0 ||
-         parsed_way.duration > 0 || parsed_way.weight > 0) &&
+        (parsed_way.forward_speed > 0 || parsed_way.forward_rate > 0 || parsed_way.duration > 0 ||
+         parsed_way.weight > 0) &&
         (parsed_way.forward_travel_mode != TRAVEL_MODE_INACCESSIBLE);
 
     const bool in_backward_direction =
-        (parsed_way.backward_speed > 0 || parsed_way.backward_rate > 0 ||
-         parsed_way.duration > 0 || parsed_way.weight > 0) &&
+        (parsed_way.backward_speed > 0 || parsed_way.backward_rate > 0 || parsed_way.duration > 0 ||
+         parsed_way.weight > 0) &&
         (parsed_way.backward_travel_mode != TRAVEL_MODE_INACCESSIBLE);
 
-    const bool split_edge =
-        in_forward_direction && in_backward_direction &&
-        ((parsed_way.forward_rate != parsed_way.backward_rate) ||
-         (parsed_way.forward_speed != parsed_way.backward_speed) ||
-         (parsed_way.forward_travel_mode != parsed_way.backward_travel_mode) ||
-         (turn_lane_id_forward != turn_lane_id_backward));
+    const bool split_edge = in_forward_direction && in_backward_direction &&
+                            ((parsed_way.forward_rate != parsed_way.backward_rate) ||
+                             (parsed_way.forward_speed != parsed_way.backward_speed) ||
+                             (parsed_way.forward_travel_mode != parsed_way.backward_travel_mode) ||
+                             (turn_lane_id_forward != turn_lane_id_backward));
 
     if (in_forward_direction)
     {
