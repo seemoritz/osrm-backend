@@ -42,8 +42,8 @@ struct ExtractionWay
     {
         forward_speed = -1;
         backward_speed = -1;
-        forward_weight_per_meter = -1;
-        backward_weight_per_meter = -1;
+        forward_rate = -1;
+        backward_rate = -1;
         duration = -1;
         weight = -1;
         roundabout = false;
@@ -91,8 +91,8 @@ struct ExtractionWay
     double forward_speed;
     double backward_speed;
     // weight per meter
-    double forward_weight_per_meter;
-    double backward_weight_per_meter;
+    double forward_rate;
+    double backward_rate;
     // duration of the whole way in both directions
     double duration;
     // weight of the whole way in both directions

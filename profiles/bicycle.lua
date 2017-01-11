@@ -402,16 +402,16 @@ function way_function (way, result)
   local is_unsafe = safety_penalty < 1 and unsafe_highway_list[highway]
   if result.forward_speed > 0 then
     -- convert from km/h to m/s
-    result.forward_weight_per_meter = result.forward_speed / 3.6;
+    result.forward_rate = result.forward_speed / 3.6;
     if is_unsafe then
-      result.forward_weight_per_meter = result.forward_weight_per_meter * safety_penalty
+      result.forward_rate = result.forward_rate * safety_penalty
     end
   end
   if result.backward_speed > 0 then
     -- convert from km/h to m/s
-    result.backward_weight_per_meter = result.backward_speed / 3.6;
+    result.backward_rate = result.backward_speed / 3.6;
     if is_unsafe then
-      result.backward_weight_per_meter = result.backward_weight_per_meter * safety_penalty
+      result.backward_rate = result.backward_rate * safety_penalty
     end
   end
   if result.duration > 0 then
