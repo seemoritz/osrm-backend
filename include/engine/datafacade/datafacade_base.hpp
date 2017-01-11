@@ -185,7 +185,7 @@ class BaseDataFacade
 
     virtual const char *GetWeightName() const = 0;
 
-    virtual const unsigned GetWeightPrecision() const = 0;
+    virtual unsigned GetWeightPrecision() const = 0;
 
     virtual BearingClassID GetBearingClassID(const NodeID id) const = 0;
 

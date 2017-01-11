@@ -142,8 +142,8 @@ Feature: Weight tests
           result.forward_mode = mode.driving
           result.backward_mode = mode.driving
           result.duration = 42
-          result.forward_weight_per_meter = 1
-          result.backward_weight_per_meter = 0.5
+          result.forward_rate = 1
+          result.backward_rate = 0.5
         end
         """
 
@@ -170,6 +170,7 @@ Feature: Weight tests
     Scenario: Step weights -- segment_function
         Given the profile file "testbot" extended with
         """
+        api_version = 1
         properties.weight_name = 'steps'
         function way_function(way, result)
           result.forward_mode = mode.driving

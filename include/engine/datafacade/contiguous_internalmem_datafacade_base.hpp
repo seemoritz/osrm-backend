@@ -976,7 +976,7 @@ class ContiguousInternalMemoryDataFacadeBase : public BaseDataFacade
 
     const char *GetWeightName() const override final { return m_profile_properties->weight_name; }
 
-    const unsigned GetWeightPrecision() const override final { return m_profile_properties->weight_precision; }
+    unsigned GetWeightPrecision() const override final { return m_profile_properties->weight_precision; }
 
     BearingClassID GetBearingClassID(const NodeID id) const override final
     {

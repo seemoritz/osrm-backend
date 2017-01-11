@@ -221,7 +221,7 @@ class MockDataFacade final : public engine::datafacade::BaseDataFacade
     bool GetContinueStraightDefault() const override { return true; }
     double GetMapMatchingMaxSpeed() const override { return 180 / 3.6; }
     const char *GetWeightName() const override final { return "duration"; }
-    const unsigned GetWeightPrecision() const override final { return 1; }
+    unsigned GetWeightPrecision() const override final { return 1; }
     BearingClassID GetBearingClassID(const NodeID /*id*/) const override { return 0; }
     EntryClassID GetEntryClassID(const EdgeID /*id*/) const override { return 0; }
 
