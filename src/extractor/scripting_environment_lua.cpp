@@ -586,15 +586,12 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
 
             if (turn.turn_type != guidance::TurnType::NoTurn)
             {
-                turn.duration = turn_function(turn.angle);
-
-                // add traffic light penalty
-                if (turn.has_traffic_light)
-                    turn.duration += context.properties.traffic_signal_penalty;
+                // Get turn duration and convert deci-seconds to seconds
+                turn.duration = static_cast<double>(turn_function(turn.angle)) / 10.;
 
                 // add U-turn penalty
                 if (turn.direction_modifier == guidance::DirectionModifier::UTurn)
-                    turn.duration += context.properties.u_turn_penalty;
+                    turn.duration += context.properties.GetUturnPenalty();
             }
             else
             {
@@ -608,6 +605,13 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
             turn.weight = turn.duration;
             break;
         }
+    }
+    else if (context.api_version == 0)
+    {
+        // Add traffic light penalty, back-compatibility of api_version=0
+        if (turn.has_traffic_light)
+            turn.duration += context.properties.GetTrafficSignalPenalty();
+        turn.weight = turn.duration;
     }
 }
 

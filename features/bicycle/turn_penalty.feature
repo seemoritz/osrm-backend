@@ -4,8 +4,10 @@ Feature: Turn Penalties
     Background:
         Given the profile file "testbot" extended with
           """
-          properties.weight_name = 'duration'
           api_version = 1
+          properties.weight_name = 'duration'
+          properties.traffic_signal_penalty = 0
+          properties.u_turn_penalty = 0
           function turn_function (turn)
               turn.duration = 20 * math.abs(turn.angle) / 180 -- penalty
           end

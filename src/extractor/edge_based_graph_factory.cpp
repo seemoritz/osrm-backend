@@ -370,6 +370,9 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
     std::vector<TurnPenalty> turn_weight_penalties;
     std::vector<TurnPenalty> turn_duration_penalties;
 
+    const auto weight_multiplier =
+        std::pow(10, scripting_environment.GetProfileProperties().weight_precision);
+
     {
         util::UnbufferedLog log;
 
@@ -528,7 +531,7 @@ void EdgeBasedGraphFactory::GenerateEdgeExpandedEdges(
                     // turn penalties are limited to [-2^15, 2^15) which roughly
                     // translates to 54 minutes and fits signed 16bit deci-seconds
                     auto weight_penalty =
-                        boost::numeric_cast<TurnPenalty>(extracted_turn.weight * 10.);
+                        boost::numeric_cast<TurnPenalty>(extracted_turn.weight * weight_multiplier);
                     auto duration_penalty =
                         boost::numeric_cast<TurnPenalty>(extracted_turn.duration * 10.);
 

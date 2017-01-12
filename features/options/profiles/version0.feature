@@ -72,7 +72,7 @@ end
 
 function turn_function (angle)
   print('turn_function ' .. angle)
-  return angle == 0 and 0 or 1.7
+  return angle == 0 and 0 or 17
 end
 
 function segment_function (source, target, distance, weight)

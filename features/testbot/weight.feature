@@ -84,6 +84,9 @@ Feature: Weight tests
     Scenario: Step weights -- way_function: fail if no weight or weight_per_meter property
         Given the profile file "testbot" extended with
         """
+        api_version = 1
+        properties.traffic_signal_penalty = 0
+        properties.u_turn_penalty = 0
         properties.weight_name = 'steps'
         function way_function(way, result)
           result.forward_mode = mode.driving
@@ -108,6 +111,9 @@ Feature: Weight tests
     Scenario: Step weights -- way_function: second way wins
         Given the profile file "testbot" extended with
         """
+        api_version = 1
+        properties.traffic_signal_penalty = 0
+        properties.u_turn_penalty = 0
         properties.weight_name = 'steps'
         function way_function(way, result)
           result.forward_mode = mode.driving
@@ -137,6 +143,9 @@ Feature: Weight tests
     Scenario: Step weights -- way_function: higher weight_per_meter is preferred
         Given the profile file "testbot" extended with
         """
+        api_version = 1
+        properties.traffic_signal_penalty = 0
+        properties.u_turn_penalty = 0
         properties.weight_name = 'steps'
         function way_function(way, result)
           result.forward_mode = mode.driving
@@ -171,6 +180,8 @@ Feature: Weight tests
         Given the profile file "testbot" extended with
         """
         api_version = 1
+        properties.traffic_signal_penalty = 0
+        properties.u_turn_penalty = 0
         properties.weight_name = 'steps'
         function way_function(way, result)
           result.forward_mode = mode.driving
