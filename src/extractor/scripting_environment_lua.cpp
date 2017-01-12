@@ -568,26 +568,29 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
 {
     auto &context = GetSol2Context();
 
-    if (context.has_turn_penalty_function)
+    sol::function turn_function = context.state["turn_function"];
+    switch (context.api_version)
     {
-        sol::function turn_function = context.state["turn_function"];
-        switch (context.api_version)
+    case 1:
+        if (context.has_turn_penalty_function)
         {
-        case 1:
             turn_function(turn);
 
             // Turn weight falls back to the duration value in deciseconds
             // or uses the extracted unit-less weight value
             if (context.properties.fallback_to_duration)
                 turn.weight = turn.duration;
+        }
 
-            break;
-        case 0:
-
+        break;
+    case 0:
+        if (context.has_turn_penalty_function)
+        {
             if (turn.turn_type != guidance::TurnType::NoTurn)
             {
                 // Get turn duration and convert deci-seconds to seconds
                 turn.duration = static_cast<double>(turn_function(turn.angle)) / 10.;
+                BOOST_ASSERT(turn.weight == 0);
 
                 // add U-turn penalty
                 if (turn.direction_modifier == guidance::DirectionModifier::UTurn)
@@ -599,19 +602,15 @@ void Sol2ScriptingEnvironment::ProcessTurn(ExtractionTurn &turn)
                 // since OSRM cannot handle looping roads/parallel roads
                 turn.duration = 0.;
             }
-
-            // Turn weight falls back to the duration value in deciseconds
-            BOOST_ASSERT(turn.weight == 0);
-            turn.weight = turn.duration;
-            break;
         }
-    }
-    else if (context.api_version == 0)
-    {
+
         // Add traffic light penalty, back-compatibility of api_version=0
         if (turn.has_traffic_light)
             turn.duration += context.properties.GetTrafficSignalPenalty();
+
+        // Turn weight falls back to the duration value in deciseconds
         turn.weight = turn.duration;
+        break;
     }
 }
 
