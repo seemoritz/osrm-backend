@@ -5,6 +5,10 @@
 #include "engine/search_engine_data.hpp"
 #include "util/typedefs.hpp"
 
+#include "tbb/enumerable_thread_specific.h"
+#include "tbb/parallel_for.h"
+#include "tbb/blocked_range.h"
+
 #include <boost/assert.hpp>
 
 #include <limits>
@@ -59,14 +63,29 @@ class ManyToManyRouting final
         std::vector<EdgeWeight> result_table(number_of_entries,
                                              std::numeric_limits<EdgeWeight>::max());
 
-        engine_working_data.InitializeOrClearFirstThreadLocalStorage(facade.GetNumberOfNodes());
+        using ThreadedQueryHeap = tbb::enumerable_thread_specific<std::unique_ptr<QueryHeap>>;
+        ThreadedQueryHeap heaps;
 
-        QueryHeap &query_heap = *(engine_working_data.forward_heap_1);
+        using ThreadedBuckets =
+            tbb::enumerable_thread_specific<std::unique_ptr<SearchSpaceWithBuckets>>;
+        ThreadedBuckets buckets;
 
-        SearchSpaceWithBuckets search_space_with_buckets;
+        const auto search_target_phantom = [this, &heaps, &buckets, &facade](
+            const PhantomNode &phantom, unsigned column_idx) {
+            auto &heap_pointer = heaps.local();
+            if (heap_pointer == nullptr)
+            {
+                heap_pointer.reset(new QueryHeap(facade.GetNumberOfNodes()));
+            }
+            auto &query_heap = *heap_pointer;
 
-        unsigned column_idx = 0;
-        const auto search_target_phantom = [&](const PhantomNode &phantom) {
+            auto &bucket_pointer = buckets.local();
+            if (bucket_pointer == nullptr)
+            {
+                bucket_pointer.reset(new SearchSpaceWithBuckets);
+            }
+            auto &search_space_with_buckets = *bucket_pointer;
+
             query_heap.Clear();
             // insert target(s) at weight 0
 
@@ -88,12 +107,24 @@ class ManyToManyRouting final
             {
                 BackwardRoutingStep(facade, column_idx, query_heap, search_space_with_buckets);
             }
-            ++column_idx;
         };
 
+        SearchSpaceWithBuckets search_space_with_buckets;
+
         // for each source do forward search
-        unsigned row_idx = 0;
-        const auto search_source_phantom = [&](const PhantomNode &phantom) {
+        const auto search_source_phantom = [this,
+                                            &heaps,
+                                            &facade,
+                                            &search_space_with_buckets,
+                                            &result_table,
+                                            number_of_targets](const PhantomNode &phantom,
+                                                               unsigned row_idx) {
+            auto &heap_pointer = heaps.local();
+            if (heap_pointer == nullptr)
+            {
+                heap_pointer.reset(new QueryHeap(facade.GetNumberOfNodes()));
+            }
+            auto &query_heap = *heap_pointer;
             query_heap.Clear();
             // insert target(s) at weight 0
 
@@ -120,39 +151,62 @@ class ManyToManyRouting final
                                    search_space_with_buckets,
                                    result_table);
             }
-            ++row_idx;
         };
 
         if (target_indices.empty())
         {
-            for (const auto &phantom : phantom_nodes)
-            {
-                search_target_phantom(phantom);
-            }
+            tbb::parallel_for(tbb::blocked_range<std::size_t>(0, phantom_nodes.size()),
+                              [&search_target_phantom, &phantom_nodes](const tbb::blocked_range<std::size_t> &rg) {
+                                  for (auto column = rg.begin(); column < rg.end(); column++)
+                                  {
+                                      search_target_phantom(phantom_nodes[column], column);
+                                  }
+                              });
         }
         else
         {
-            for (const auto index : target_indices)
+            tbb::parallel_for(tbb::blocked_range<std::size_t>(0, target_indices.size()),
+                              [&search_target_phantom, &phantom_nodes, &target_indices](
+                                  const tbb::blocked_range<std::size_t> &rg) {
+                                  for (auto column = rg.begin(); column < rg.end(); column++)
+                                  {
+                                      const auto &phantom = phantom_nodes[target_indices[column]];
+                                      search_target_phantom(phantom, column);
+                                  }
+                              });
+        }
+
+        for (const auto &bucket : buckets)
+        {
+            for (const auto &id_and_bucket : *bucket)
             {
-                const auto &phantom = phantom_nodes[index];
-                search_target_phantom(phantom);
+                auto &resulting_bucket = search_space_with_buckets[id_and_bucket.first];
+                resulting_bucket.insert(resulting_bucket.end(), id_and_bucket.second.begin(), id_and_bucket.second.end());
             }
         }
+        buckets.clear();
 
         if (source_indices.empty())
         {
-            for (const auto &phantom : phantom_nodes)
-            {
-                search_source_phantom(phantom);
-            }
+            tbb::parallel_for(tbb::blocked_range<std::size_t>(0, phantom_nodes.size()),
+                              [&search_source_phantom, &phantom_nodes](const tbb::blocked_range<std::size_t> &rg) {
+                                  for (auto row = rg.begin(); row < rg.end(); row++)
+                                  {
+                                      search_source_phantom(phantom_nodes[row], row);
+                                  }
+                              });
         }
         else
         {
-            for (const auto index : source_indices)
-            {
-                const auto &phantom = phantom_nodes[index];
-                search_source_phantom(phantom);
-            }
+            tbb::parallel_for(tbb::blocked_range<std::size_t>(0, source_indices.size()),
+                              [&search_source_phantom, &phantom_nodes, &source_indices](
+                                  const tbb::blocked_range<std::size_t> &rg) {
+                                  for (auto row = rg.begin(); row < rg.end(); row++)
+                                  {
+                                      const auto &phantom = phantom_nodes[source_indices[row]];
+                                      search_source_phantom(phantom, row);
+                                  }
+                              });
         }
 
         return result_table;
