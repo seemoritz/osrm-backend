@@ -11,6 +11,9 @@
 #include "util/integer_range.hpp"
 #include "util/json_container.hpp"
 
+#include "tbb/parallel_for.h"
+#include "tbb/blocked_range.h"
+
 #include <algorithm>
 #include <iterator>
 #include <string>
@@ -216,6 +219,12 @@ class BasePlugin
         return phantom_nodes;
     }
 
+    struct no_node_found : std::exception {
+        const char* what() const noexcept override {
+            return "An input coordinate could not be mapped to a node.";
+        }
+    };
+
     std::vector<PhantomNodePair> GetPhantomNodes(const datafacade::BaseDataFacade &facade,
                                                  const api::BaseParameters &parameters) const
     {
@@ -226,14 +235,13 @@ class BasePlugin
         const bool use_radiuses = !parameters.radiuses.empty();
 
         BOOST_ASSERT(parameters.IsValid());
-        for (const auto i : util::irange<std::size_t>(0UL, parameters.coordinates.size()))
-        {
+        auto find_one_node_pair = [=, &phantom_node_pairs, &parameters, &facade](std::size_t i) {
             if (use_hints && parameters.hints[i] &&
                 parameters.hints[i]->IsValid(parameters.coordinates[i], facade))
             {
                 phantom_node_pairs[i].first = parameters.hints[i]->phantom;
                 // we don't set the second one - it will be marked as invalid
-                continue;
+                return;
             }
 
             if (use_bearings && parameters.bearings[i])
@@ -275,13 +283,21 @@ class BasePlugin
             // we didn't find a fitting node, return error
             if (!phantom_node_pairs[i].first.IsValid(facade.GetNumberOfNodes()))
             {
-                // TODO document why?
-                phantom_node_pairs.pop_back();
-                break;
+                throw no_node_found{};
             }
             BOOST_ASSERT(phantom_node_pairs[i].first.IsValid(facade.GetNumberOfNodes()));
             BOOST_ASSERT(phantom_node_pairs[i].second.IsValid(facade.GetNumberOfNodes()));
-        }
+        };
+
+        auto block_work = [&find_one_node_pair](const tbb::blocked_range<std::size_t> &rg) {
+            for (auto i = rg.begin(); i < rg.end(); ++i)
+            {
+                find_one_node_pair(i);
+            }
+        };
+        tbb::parallel_for(tbb::blocked_range<std::size_t>(0UL, parameters.coordinates.size()),
+                          block_work);
+
         return phantom_node_pairs;
     }
 };
