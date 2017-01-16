@@ -30,10 +30,10 @@ struct QueryEdge
         // based edge) storing the appropriate data. If `shortcut` is set to true, we get the middle
         // node. Otherwise we see the edge based node to access node data.
         NodeID id : 31;
-        bool shortcut : 1;
+        unsigned shortcut : 1;
         int weight : 30;
-        bool forward : 1;
-        bool backward : 1;
+        int forward : 1;
+        int backward : 1;
     } data;
 
     QueryEdge() : source(SPECIAL_NODEID), target(SPECIAL_NODEID) {}
